@@ -1,0 +1,88 @@
+import React from 'react';
+import { useAuth } from '../context/AuthContext'; // Import Auth Context
+
+const Sidebar = ({ activeTab, setActiveTab, isOpen }) => {
+  const { user } = useAuth(); // Retrieve current user
+
+  // Define base menu items available to everyone (Students)
+  const baseItems = [
+    { id: 'personal-dashboard', label: 'Personal Dashboard', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
+    { id: 'team', label: 'My Team', icon: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2 M9 7a4 4 0 1 0 0-8 4 4 0 0 0 0 8 z M23 21v-2a4 4 0 0 0-3-3.87 M16 3.13a4 4 0 0 1 0 7.75' },
+    { id: 'all-tasks', label: 'Missions Board', icon: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M16 13H8 M16 17H8 M10 9H8' },
+    { id: 'alumni-connect', label: 'Connect with Alumni', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.257M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z' }
+  ];
+
+  // Define Mentor/Admin specific items
+  const mentorItems = [
+    { id: 'mentor-tasks', label: 'Task Management', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01' },
+    { id: 'mentor-teams', label: 'Team Oversight', icon: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10' }
+  ];
+
+  // Check roles (assuming user.roles is an array of strings)
+  const isPrivileged = user?.roles?.some(role => ['Mentor', 'Admin', 'Alumni'].includes(role));
+
+  // Merge items based on role
+  const menuItems = isPrivileged 
+    ? [...baseItems, ...mentorItems] 
+    : baseItems;
+
+  return (
+    <aside 
+      className={`fixed left-0 top-16 h-[calc(100vh-4rem)] w-64 bg-black border-r border-red-900/30 overflow-y-auto z-40 transition-transform duration-300 ease-in-out scrollbar-hide ${
+        isOpen ? 'translate-x-0' : '-translate-x-full'
+      }`}
+    >
+      <div className="pt-8">
+        <div className="px-3 mb-8">
+          <p className="px-4 text-xs font-bold text-red-600/80 uppercase tracking-widest mb-4 font-creepster">
+            {isPrivileged ? 'Command Center' : 'Operations'}
+          </p>
+          <ul className="space-y-1">
+            {menuItems.map((item) => (
+              <li key={item.id}>
+                <button
+                  onClick={() => setActiveTab(item.id)}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-md text-sm font-medium transition-all duration-300 border border-transparent whitespace-nowrap ${
+                    activeTab === item.id 
+                      ? 'bg-red-900/10 text-red-500 border-red-900/30 shadow-[0_0_10px_rgba(220,38,38,0.1)]' 
+                      : 'text-gray-400 hover:text-red-400 hover:bg-red-900/5'
+                  }`}
+                >
+                  <svg 
+                    xmlns="http://www.w3.org/2000/svg" 
+                    width="18" 
+                    height="18" 
+                    viewBox="0 0 24 24" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    strokeWidth="2" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round"
+                    className={`min-w-[18px] transition-all duration-300 ${activeTab === item.id ? 'drop-shadow-[0_0_5px_rgba(239,68,68,0.8)]' : ''}`}
+                  >
+                    <path d={item.icon} />
+                  </svg>
+                  {item.label}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+        
+        {/* Bottom Decoration */}
+        <div className="absolute bottom-0 w-full p-6 bg-gradient-to-t from-red-900/10 to-transparent">
+          <div className="border-t border-red-900/30 pt-4 text-center">
+            <p className="text-xl text-red-700 font-creepster opacity-60">The Upside Down</p>
+            {user && (
+              <p className="text-xs text-gray-500 mt-2 truncate px-2">
+                Logged in as: {user.name} ({user.roles?.[0]})
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+    </aside>
+  );
+};
+
+export default Sidebar;
