@@ -7,16 +7,12 @@ import { sendEmail } from "../utils/sendEmail.js";
 import twilio from "twilio";
 import { sendToken } from "../utils/sendToken.js";
 import crypto from "crypto";
+
+import { validatePhoneNumber } from "../utils/validation.js";
 import { OAuth2Client } from 'google-auth-library';
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-
 const client = twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN);
 
-// Validate phone number
-function validatePhoneNumber(phone) {
-  const phoneRegex = /^\+91[6-9]\d{9}$/;
-  return phoneRegex.test(phone);
-}
 
 // Generate email template
 function generateEmailTemplate(verificationCode) {

@@ -5,97 +5,120 @@ import crypto from 'crypto';
 
 const userSchema = new mongoose.Schema({
   // Core Identity
-  email: { 
-    type: String, 
-    required: [true, "Please enter your email"], 
-    unique: true, 
+  email: {
+    type: String,
+    required: [true, "Please enter your email"],
+    unique: true,
     trim: true,
-    lowercase: true
+    lowercase: true,
   },
-  googleId: { // <--- ADD THIS
+
+  googleId: {
     type: String,
     unique: true,
-    sparse: true // Allows null/undefined values to exist alongside unique ones
+    sparse: true
   },
+
   password: { 
     type: String, 
     required: [true, "Please enter your password"],
     minlength: [8, "Password must be at least 8 characters"],
-    select: false 
+    select: false,
   },
-  name: { 
-    type: String, 
+
+  name: {
+    type: String,
     required: [true, "Please enter your name"],
-    trim: true
+    trim: true,
   },
-  phone: { 
-    type: String, 
+
+  phone: {
+    type: String,
     required: [true, "Please enter your phone number"],
     unique: true,
+    trim: true,
+  },
+
+  // Added from other branch
+  branch: {
+    type: String,
     trim: true
   },
-  
-  // Role Management
-  roles: [{ 
-    type: String, 
-    enum: ['Mentor', 'Student'], 
-    default: 'Student' 
-  }],
-  
-  // Status
-  status: { 
-    type: String, 
-    enum: ['Active', 'Banned', 'Restricted', 'Pending'], 
-    default: 'Pending' 
-  },
-  
-  isAlumnus: { 
-    type: Boolean, 
-    default: false 
-  },
-  
 
-branch: {
-  type: String,
-  trim: true
-},
-rollNumber: {
-  type: String,
-  trim: true
-},
+  rollNumber: {
+    type: String,
+    trim: true
+  },
+
+  // Role Management
+  roles: [
+    {
+      type: String,
+      enum: ["Mentor", "Student"],
+      default: "Student",
+    },
+  ],
+
+  // Status
+  status: {
+    type: String,
+    enum: ["Active", "Banned", "Restricted", "Pending"],
+    default: "Pending",
+  },
+
+  isAlumnus: {
+    type: Boolean,
+    default: false,
+  },
 
   // Verification
-  accountVerified: { 
-    type: Boolean, 
-    default: false 
+  accountVerified: {
+    type: Boolean,
+    default: false,
   },
-  emailVerified: { 
-    type: Boolean, 
-    default: false 
+  emailVerified: {
+    type: Boolean,
+    default: false,
   },
-  verificationCode: { 
-    type: Number 
+  verificationCode: {
+    type: Number,
   },
-  verificationCodeExpire: { 
-    type: Date 
+  verificationCodeExpire: {
+    type: Date,
   },
-  
+
+  profilePhoto: {
+    type: String,
+    default: "https://api.dicebear.com/7.x/avataaars/svg?seed=default",
+  },
+
+  resume: {
+    type: String,
+  },
+
+  bio: {
+    type: String,
+    maxlength: [500, "Bio cannot exceed 500 characters"],
+  },
+
+  github: {
+    type: String,
+    trim: true,
+  },
+
   // Password Reset
   resetPasswordToken: String,
   resetPasswordExpire: Date,
-  
 
-
-  
   // Timestamps
-  createdAt: { 
-    type: Date, 
-    default: Date.now 
+  createdAt: {
+    type: Date,
+    default: Date.now,
   },
-  updatedAt: { 
-    type: Date, 
-    default: Date.now 
-  }
+  updatedAt: {
+    type: Date,
+    default: Date.now,
+  },
 });
 
 // Hash password before saving
@@ -113,7 +136,7 @@ userSchema.pre("save", function (next) {
   next();
 });
 
-// Compare password method
+// Compare password
 userSchema.methods.comparePassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
@@ -151,12 +174,12 @@ userSchema.methods.generateResetPasswordToken = function () {
     .update(resetToken)
     .digest("hex");
     
-  this.resetPasswordExpire = Date.now() + 15 * 60 * 1000; // 15 minutes
+  this.resetPasswordExpire = Date.now() + 15 * 60 * 1000;
   
   return resetToken;
 };
 
-// Mentor Profile Schema (One-to-One relationship)
+// Mentor Profile Schema
 const mentorProfileSchema = new mongoose.Schema({
   user: { 
     type: mongoose.Schema.Types.ObjectId, 
