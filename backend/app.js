@@ -1,3 +1,84 @@
+// import express from "express";
+// import cors from "cors";
+// import cookieParser from "cookie-parser";
+// import dotenv from "dotenv";
+// import path from "path";
+// import { fileURLToPath } from "url";
+// import { connectDatabase } from "./config/database.js";
+// import userRoutes from "./routes/userRoutes.js";
+// import teamRoutes from "./routes/teamRoutes.js";
+// import taskRoutes from "./routes/taskRoutes.js"; //     // <--- ADD THIS
+// import rubricRoutes from "./routes/rubricRoutes.js"; // <--- ADD THIS
+// import invitationRoutes from "./routes/invitationRoutes.js";
+
+// const __filename = fileURLToPath(import.meta.url);
+// const __dirname = path.dirname(__filename);
+
+// // Load environment variables FIRST
+// console.log('🔧 Loading environment variables...');
+// dotenv.config({ path: path.join(__dirname, 'config.env') });
+
+// // Check critical variables
+// if (!process.env.MONGO_URI) {
+//   console.error('❌ MONGO_URI not found!');
+//   process.exit(1);
+// }
+
+// console.log('✅ Environment loaded');
+// console.log('📍 MONGO_URI:', process.env.MONGO_URI ? 'Found ✓' : 'Missing ✗');
+// console.log('📍 SMTP_MAIL:', process.env.SMTP_MAIL || 'Missing');
+
+// // Connect to database
+// connectDatabase();
+
+// export const app = express();
+
+// // Middleware
+// app.use(express.json());
+// app.use(express.urlencoded({ extended: true }));
+// app.use(cookieParser());
+// app.use(cors({
+//   origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+//   credentials: true,
+// }));
+
+// // Routes
+// app.use("/api/auth", userRoutes);
+// app.use("/api/team", teamRoutes);
+// app.use("/api/task", taskRoutes); // <--- REGISTER THIS ROUTE
+
+// app.use("/api/invitation", invitationRoutes); // ✅ FIXED: Removed /v1
+
+// app.get("/", (req, res) => {
+//   res.json({ 
+//     success: true,
+//     message: "Server is running!",
+//     timestamp: new Date().toISOString()
+//   });
+// });
+
+// // 404 Handler
+// app.use((req, res, next) => {
+//   res.status(404).json({
+//     success: false,
+//     message: `Route ${req.originalUrl} not found`
+//   });
+// });
+
+// // Global Error Handler
+// app.use((err, req, res, next) => {
+//   err.statusCode = err.statusCode || 500;
+//   err.message = err.message || "Internal Server Error";
+
+//   res.status(err.statusCode).json({
+//     success: false,
+//     message: err.message,
+//     error: process.env.NODE_ENV === 'development' ? err : {}
+//   });
+// });
+
+
+
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
@@ -5,33 +86,34 @@ import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
 import { connectDatabase } from "./config/database.js";
-import githubRoutes from "./routes/githubRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import teamRoutes from "./routes/teamRoutes.js";
-import taskRoutes from "./routes/taskRoutes.js"; //     // <--- ADD THIS
-import rubricRoutes from "./routes/rubricRoutes.js"; // <--- ADD THIS
+import taskRoutes from "./routes/taskRoutes.js";
+import rubricRoutes from "./routes/rubricRoutes.js";
 import invitationRoutes from "./routes/invitationRoutes.js";
 import chatRoutes from "./routes/chatRoutes.js"; // <--- ADD THIS
 // ... existing imports
 import referralRoutes from "./routes/referralRoutes.js"; // <--- Add Import
 
 
+
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Load environment variables FIRST
-console.log("🔧 Loading environment variables...");
-dotenv.config({ path: path.join(__dirname, "config.env") });
+console.log('🔧 Loading environment variables...');
+dotenv.config({ path: path.join(__dirname, 'config.env') });
 
 // Check critical variables
 if (!process.env.MONGO_URI) {
-  console.error("❌ MONGO_URI not found!");
+  console.error('❌ MONGO_URI not found!');
   process.exit(1);
 }
 
-console.log("✅ Environment loaded");
-console.log("📍 MONGO_URI:", process.env.MONGO_URI ? "Found ✓" : "Missing ✗");
-console.log("📍 SMTP_MAIL:", process.env.SMTP_MAIL || "Missing");
+console.log('✅ Environment loaded');
+console.log('📍 MONGO_URI:', process.env.MONGO_URI ? 'Found ✓' : 'Missing ✗');
+console.log('📍 SMTP_MAIL:', process.env.SMTP_MAIL || 'Missing');
 
 // Connect to database
 connectDatabase();
@@ -42,11 +124,22 @@ export const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
-
 app.use(cors({
   origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
   credentials: true,
 }));
+
+
+
+
+
+
+// ✅ ADD REQUEST LOGGER
+app.use((req, res, next) => {
+  console.log(`📨 ${req.method} ${req.originalUrl}`);
+  next();
+});
+
 
 // Routes
 app.use("/api/auth", userRoutes);
@@ -58,45 +151,66 @@ app.use("/api/invitation", invitationRoutes); // ✅ FIXED: Removed /v1
 app.use("/api/chat", chatRoutes); // <--- Add this line
 
 
-// Root route
 app.get("/", (req, res) => {
-  res.json({
+  res.json({ 
     success: true,
     message: "Server is running!",
     timestamp: new Date().toISOString(),
+    routes: {
+      auth: '/api/auth',
+      team: '/api/team',
+      task: '/api/task',
+      invitation: '/api/invitation'
+    }
   });
 });
 
-// API Routes - MUST come before 404 handler
-app.use("/api/auth", userRoutes);
-app.use("/api/team", teamRoutes);
-app.use("/api/v1/github", githubRoutes);
-
-// Optional: Test route to verify routing is working
-app.get("/api/test", (req, res) => {
-  res.json({
-    success: true,
-    message: "API routes are properly configured!",
+// ✅ ADD ROUTE LISTING FOR DEBUG
+app.get("/api/routes", (req, res) => {
+  const routes = [];
+  app._router.stack.forEach((middleware) => {
+    if (middleware.route) {
+      routes.push({
+        path: middleware.route.path,
+        methods: Object.keys(middleware.route.methods)
+      });
+    } else if (middleware.name === 'router') {
+      middleware.handle.stack.forEach((handler) => {
+        if (handler.route) {
+          const path = middleware.regexp.source
+            .replace('\\/?', '')
+            .replace('(?=\\/|$)', '')
+            .replace(/\\\//g, '/')
+            .replace('^', '');
+          routes.push({
+            path: path + handler.route.path,
+            methods: Object.keys(handler.route.methods)
+          });
+        }
+      });
+    }
   });
+  res.json({ success: true, routes });
 });
 
+// 404 Handler
 app.use((req, res, next) => {
-  console.log(`⚠️ 404 - Route not found: ${req.method} ${req.originalUrl}`);
+  console.log('❌ 404 Not Found:', req.originalUrl);
   res.status(404).json({
     success: false,
-    message: `Route ${req.originalUrl} not found`,
+    message: `Route ${req.originalUrl} not found`
   });
 });
 
-// Global Error Handler - MUST be last
+// Global Error Handler
 app.use((err, req, res, next) => {
-  console.error("❌ Error:", err.message);
+  console.error('💥 Error:', err.message);
   err.statusCode = err.statusCode || 500;
   err.message = err.message || "Internal Server Error";
 
   res.status(err.statusCode).json({
     success: false,
     message: err.message,
-    error: process.env.NODE_ENV === "development" ? err.stack : {},
+    error: process.env.NODE_ENV === 'development' ? err.stack : {}
   });
 });

@@ -2,12 +2,11 @@ import "./config/env.js";
 import dotenv from "dotenv";
 import { app } from "./app.js";
 import { connectDatabase } from "./config/database.js";
-import { cloudinary } from "./config/cloudinary.js";
 import http from "http";
 import { Server } from "socket.io";
-import { Message } from "./models/MessageModel.js";
+import { Message } from "./models/MessageModel.js"; 
 
-dotenv.config({ path: "./config.env" });
+dotenv.config({ path: './config.env' });
 
 connectDatabase();
 
@@ -26,39 +25,42 @@ const io = new Server(server, {
 io.on("connection", (socket) => {
   console.log(`User Connected: ${socket.id}`);
 
-  // User joins personal room
+  // 1. SETUP: User joins their own room (Essential for notifications)
   socket.on("setup", (userId) => {
-    socket.join(userId);
+    socket.join(userId); 
     console.log(`User ${userId} joined their personal room`);
   });
 
-  // Join chat room
+  // 2. CHAT: Join specific chat session
   socket.on("join_room", (sessionId) => {
     socket.join(sessionId);
   });
 
-  // Send chat message
+  // 3. CHAT: Send Message
   socket.on("send_message", async (data) => {
     try {
       await Message.create({
         session: data.sessionId,
         sender: data.senderId,
-        content: data.content,
+        content: data.content
       });
-
+      // Broadcast to everyone in the chat room
       io.in(data.sessionId).emit("receive_message", data);
     } catch (err) {
       console.error("Message save error:", err);
     }
   });
 
-  // Send request notification
+  // 4. NEW REQUEST: Notify Receiver
   socket.on("send_request", (data) => {
+    // data = { receiverId, senderName, ... }
     io.in(data.receiverId).emit("request_received", data);
   });
 
-  // Accept request notification
+  // 5. ACCEPT REQUEST: Notify Sender (NEW FIX)
   socket.on("accept_request", (data) => {
+    // data = { senderId, session }
+    // Notify the person who sent the request that it's accepted
     io.in(data.senderId).emit("request_accepted", data);
   });
 
@@ -68,5 +70,5 @@ io.on("connection", (socket) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(` Server running on port ${PORT}`);
 });

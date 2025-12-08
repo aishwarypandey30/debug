@@ -3,7 +3,6 @@ import ErrorHandler from "../middlewares/error.js";
 import { Task } from "../models/TaskModel.js";
 import { TeamProgress } from "../models/TeamProgressModel.js"; 
 
-// @desc    Create a new Task (Mission)
 export const createTask = catchAsyncError(async (req, res, next) => {
   const { 
     title, 
@@ -114,7 +113,6 @@ export const deleteTask = catchAsyncError(async (req, res, next) => {
   });
 });
 
-// ---------------- ASSIGNMENT LOGIC ----------------
 
 export const assignTeamToTask = catchAsyncError(async (req, res, next) => {
   const { teamId, taskId } = req.body;
