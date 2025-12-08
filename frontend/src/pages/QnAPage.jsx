@@ -14,8 +14,8 @@ const QnAPage = () => {
   const [loading, setLoading] = useState(false);
   
   // Data States
-  const [sessions, setSessions] = useState([]);
-  const [requests, setRequests] = useState([]);
+  const [sessions, setSessions] = useState([]); // Active chats
+  const [requests, setRequests] = useState([]); // Pending requests
   const [searchResults, setSearchResults] = useState([]);
   
   // Chat States
@@ -39,21 +39,65 @@ const QnAPage = () => {
     scrollToBottom();
   }, [messages]);
 
-  // Initial Data Fetch
+  // --- 1. SOCKETS & INITIAL DATA SETUP ---
   useEffect(() => {
+    if (!user) return;
+
+    // Connect to personal room (allows receiving private notifications)
+    socket.emit("setup", user._id);
+
+    // Initial Fetch
     fetchMyChats();
     fetchRequests();
 
+    // Listener: Receive Message
     socket.on("receive_message", (data) => {
       if (selectedSession && data.sessionId === selectedSession._id) {
         setMessages((prev) => [...prev, data]);
       }
     });
 
-    return () => socket.off("receive_message");
-  }, [selectedSession]);
+    // Listener: Someone sent me a request
+    socket.on("request_received", () => {
+      fetchRequests(); // Refresh requests list
+    });
 
-  // --- API CALLS ---
+    // Listener: Someone accepted my request
+    socket.on("request_accepted", () => {
+      fetchMyChats(); // Refresh active chats list
+    });
+
+    return () => {
+      socket.off("receive_message");
+      socket.off("request_received");
+      socket.off("request_accepted");
+    };
+  }, [user, selectedSession]); // Dependencies ensuring socket updates correctly
+
+  // --- 2. LIVE SEARCH LOGIC (Debounced) ---
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(async () => {
+      if (searchQuery.trim().length > 0) {
+        setLoading(true);
+        try {
+          const { data } = await axios.get(`${API_URL}/chat/search?query=${searchQuery}`, { withCredentials: true });
+          if (data.success) {
+            setSearchResults(data.users);
+          }
+        } catch (err) {
+          console.error("Search failed", err);
+        } finally {
+          setLoading(false);
+        }
+      } else {
+        setSearchResults([]);
+      }
+    }, 400); // 400ms delay to prevent spamming while typing
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchQuery]);
+
+  // --- 3. API CALLS ---
 
   const fetchMyChats = async () => {
     try {
@@ -69,21 +113,6 @@ const QnAPage = () => {
     } catch (err) { console.error(err); }
   };
 
-  const handleSearch = async (e) => {
-    e.preventDefault();
-    if (!searchQuery.trim()) return;
-    
-    setLoading(true);
-    try {
-      const { data } = await axios.get(`${API_URL}/chat/search?query=${searchQuery}`, { withCredentials: true });
-      if (data.success) setSearchResults(data.users);
-    } catch (err) {
-      alert("Search failed");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const sendChatRequest = async () => {
     if (!selectedUser || !requestTopic.trim()) {
         return alert("Please select a user and enter a topic");
@@ -96,12 +125,18 @@ const QnAPage = () => {
         );
 
         if (data.success) {
+            // Notify Receiver via Socket
+            socket.emit("send_request", {
+                receiverId: selectedUser._id,
+                senderName: user.name
+            });
+
             alert(`Request sent to ${selectedUser.name}!`);
             setSelectedUser(null);
             setRequestTopic("");
             setSearchQuery("");
             setSearchResults([]);
-            setActiveTab('active'); // Go back to main tab
+            setActiveTab('active');
         }
     } catch (err) {
         alert(err.response?.data?.message || "Failed to send request");
@@ -112,13 +147,22 @@ const QnAPage = () => {
     try {
       const { data } = await axios.put(`${API_URL}/chat/accept`, { sessionId }, { withCredentials: true });
       if (data.success) {
+        // Notify Sender via Socket (CRITICAL FIX)
+        // data.session should contain populate('sender') from the backend response
+        if (data.session.sender) {
+            socket.emit("accept_request", { 
+                senderId: data.session.sender._id 
+            });
+        }
+
         fetchRequests();
         fetchMyChats();
         setActiveTab('active');
         joinSession(data.session);
       }
     } catch (err) {
-      alert("Failed to accept");
+      console.error(err);
+      alert("Failed to accept request");
     }
   };
 
@@ -128,6 +172,7 @@ const QnAPage = () => {
     try {
       const { data } = await axios.get(`${API_URL}/chat/messages/${session._id}`, { withCredentials: true });
       if (data.success) setMessages(data.messages);
+      scrollToBottom();
     } catch (err) { console.error(err); }
   };
 
@@ -146,7 +191,7 @@ const QnAPage = () => {
     setNewMessage("");
   };
 
-  // Helper to get the "Other" person's name in a chat
+  // Helper to determine who you are chatting with
   const getChatPartner = (session) => {
     return session.sender._id === user._id ? session.receiver : session.sender;
   };
@@ -205,10 +250,13 @@ const QnAPage = () => {
                 requests.length > 0 ? (
                     requests.map(req => (
                         <div key={req._id} className="p-4 bg-gray-800/40 border border-gray-700 rounded-lg">
-                            <p className="text-sm font-bold text-white mb-1">{req.sender.name}</p>
-                            <p className="text-xs text-gray-400 mb-2">Topic: <span className="text-gray-300">{req.topic}</span></p>
-                            <button onClick={() => handleAcceptRequest(req._id)} className="w-full bg-green-600 hover:bg-green-700 text-white text-xs font-bold py-2 rounded transition-colors">
-                                Accept Chat
+                            <div className="flex justify-between items-center mb-2">
+                                <span className="text-sm font-bold text-white">{req.sender.name}</span>
+                                <span className="text-[10px] text-gray-500">{req.sender.roles?.join(', ')}</span>
+                            </div>
+                            <p className="text-xs text-gray-400 mb-3 bg-black/30 p-2 rounded">Topic: <span className="text-gray-300">{req.topic}</span></p>
+                            <button onClick={() => handleAcceptRequest(req._id)} className="w-full bg-green-600 hover:bg-green-700 text-white text-xs font-bold py-2 rounded transition-colors shadow-lg shadow-green-900/20">
+                                Accept Request
                             </button>
                         </div>
                     ))
@@ -218,55 +266,54 @@ const QnAPage = () => {
             {/* 3. SEARCH & ADD */}
             {activeTab === 'search' && (
                 <div className="space-y-4">
-                    <form onSubmit={handleSearch} className="flex gap-2">
-                        <input 
-                            type="text" 
-                            placeholder="Name or Email..." 
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="flex-1 bg-black border border-gray-700 rounded-lg px-3 py-2 text-sm focus:border-red-500 outline-none"
-                        />
-                        <button type="submit" disabled={loading} className="bg-gray-800 hover:bg-gray-700 px-3 rounded-lg text-white">
-                            {loading ? '...' : '🔍'}
-                        </button>
-                    </form>
+                    <div className="relative">
+                      <input 
+                          type="text" 
+                          placeholder="Type Name or Email..." 
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          className="w-full bg-black border border-gray-700 rounded-lg px-4 py-3 text-sm focus:border-red-500 outline-none pl-10 transition-colors"
+                      />
+                      <span className="absolute left-3 top-3 text-gray-500">🔍</span>
+                      {loading && <span className="absolute right-3 top-3 text-red-500 text-xs animate-pulse">Searching...</span>}
+                    </div>
 
-                    {/* Results */}
                     <div className="space-y-2">
                         {searchResults.map(u => (
-                            <div key={u._id} className="flex items-center justify-between p-3 bg-gray-800/30 rounded-lg border border-gray-800">
+                            <div key={u._id} className="flex items-center justify-between p-3 bg-gray-800/30 rounded-lg border border-gray-800 hover:border-red-500/30 transition-colors group">
                                 <div>
-                                    <p className="text-sm font-bold text-white">{u.name}</p>
+                                    <p className="text-sm font-bold text-white group-hover:text-red-400 transition-colors">{u.name}</p>
                                     <p className="text-[10px] text-gray-400">{u.roles.join(', ')} • {u.email}</p>
                                 </div>
                                 <button 
                                     onClick={() => setSelectedUser(u)}
-                                    className="bg-red-600/20 text-red-400 hover:bg-red-600 hover:text-white px-3 py-1 rounded text-xs transition-colors"
+                                    className="bg-red-600/10 border border-red-600/30 text-red-400 hover:bg-red-600 hover:text-white px-3 py-1.5 rounded text-xs transition-colors"
                                 >
-                                    Select
+                                    Request
                                 </button>
                             </div>
                         ))}
+                        {searchQuery && !loading && searchResults.length === 0 && (
+                            <p className="text-center text-gray-500 text-xs mt-2">No agents found with that name.</p>
+                        )}
                     </div>
 
                     {/* Send Request Form */}
                     {selectedUser && (
-                        <div className="mt-4 p-4 bg-red-900/10 border border-red-500/30 rounded-lg animate-fade-in">
-                            <p className="text-xs text-red-400 font-bold mb-2">Requesting chat with: {selectedUser.name}</p>
+                        <div className="mt-4 p-4 bg-red-900/10 border border-red-500/30 rounded-lg animate-fade-in shadow-xl shadow-red-900/10">
+                            <div className="flex justify-between items-start mb-2">
+                                <p className="text-xs text-red-400 font-bold uppercase tracking-wider">Requesting: {selectedUser.name}</p>
+                                <button onClick={() => setSelectedUser(null)} className="text-gray-500 hover:text-white text-xs">✕</button>
+                            </div>
                             <input 
                                 value={requestTopic}
                                 onChange={(e) => setRequestTopic(e.target.value)}
-                                placeholder="What's this about?"
-                                className="w-full bg-black border border-gray-700 rounded-lg px-3 py-2 text-sm focus:border-red-500 outline-none mb-3"
+                                placeholder="Enter topic (e.g. Project Help)..."
+                                className="w-full bg-black border border-gray-700 rounded-lg px-3 py-2 text-sm focus:border-red-500 outline-none mb-3 placeholder-gray-600"
                             />
-                            <div className="flex gap-2">
-                                <button onClick={sendChatRequest} className="flex-1 bg-red-600 hover:bg-red-700 text-white text-xs font-bold py-2 rounded">
-                                    Send Request
-                                </button>
-                                <button onClick={() => setSelectedUser(null)} className="px-3 bg-gray-800 hover:bg-gray-700 rounded text-xs">
-                                    Cancel
-                                </button>
-                            </div>
+                            <button onClick={sendChatRequest} className="w-full bg-red-600 hover:bg-red-700 text-white text-xs font-bold py-2 rounded transition-colors shadow-lg shadow-red-900/20">
+                                Send Request
+                            </button>
                         </div>
                     )}
                 </div>
@@ -279,14 +326,22 @@ const QnAPage = () => {
         {selectedSession ? (
             <>
                 <div className="p-4 bg-black/60 border-b border-red-900/30 backdrop-blur-sm flex justify-between items-center">
-                    <div>
-                        <h3 className="font-bold text-lg text-white">{getChatPartner(selectedSession).name}</h3>
-                        <p className="text-xs text-gray-400">{selectedSession.topic}</p>
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-gray-800 border border-red-500/30 overflow-hidden p-0.5">
+                             <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${getChatPartner(selectedSession).name}`} alt="Partner" className="w-full h-full rounded-full" />
+                        </div>
+                        <div>
+                            <h3 className="font-bold text-lg text-white">{getChatPartner(selectedSession).name}</h3>
+                            <p className="text-xs text-gray-400">{selectedSession.topic}</p>
+                        </div>
                     </div>
-                    <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                    <span className="flex items-center gap-2 text-xs text-green-400 border border-green-900/50 px-2 py-1 rounded-full bg-green-900/10">
+                        <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                        Secure Connection
+                    </span>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                <div className="flex-1 overflow-y-auto p-6 space-y-4 scrollbar-thin scrollbar-thumb-gray-800">
                     {messages.map((msg, idx) => {
                         const isMe = (msg.sender?._id || msg.senderId || msg.sender) === user._id;
                         const senderName = msg.sender?.name || msg.senderName || 'Unknown';
@@ -306,14 +361,14 @@ const QnAPage = () => {
                     <div ref={messagesEndRef} />
                 </div>
 
-                <div className="p-4 bg-black/60 border-t border-red-900/30">
+                <div className="p-4 bg-black/60 border-t border-red-900/30 backdrop-blur-md">
                     <div className="flex gap-2">
                         <input 
                             value={newMessage}
                             onChange={(e) => setNewMessage(e.target.value)}
                             onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-                            className="flex-1 bg-black border border-gray-700 rounded-lg px-4 py-3 text-sm focus:border-red-500 outline-none text-white"
-                            placeholder="Type your message..."
+                            className="flex-1 bg-black border border-gray-700 rounded-lg px-4 py-3 text-sm focus:border-red-500 outline-none text-white placeholder-gray-600"
+                            placeholder="Type transmission..."
                         />
                         <button onClick={sendMessage} className="bg-red-600 hover:bg-red-700 text-white px-6 rounded-lg font-bold transition-all shadow-[0_0_15px_rgba(220,38,38,0.4)]">
                             Send
@@ -322,11 +377,14 @@ const QnAPage = () => {
                 </div>
             </>
         ) : (
-            <div className="flex flex-col items-center justify-center h-full text-gray-500">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 opacity-20 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                </svg>
-                <p>Select a user or start a new chat request.</p>
+            <div className="flex flex-col items-center justify-center h-full text-gray-500 space-y-4">
+                <div className="w-20 h-20 rounded-full bg-gray-900 flex items-center justify-center border border-gray-800 animate-pulse">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-red-900" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    </svg>
+                </div>
+                <p className="text-sm uppercase tracking-widest text-gray-600">Secure Channel Offline</p>
+                <p className="text-xs text-gray-700">Select an operative to begin transmission.</p>
             </div>
         )}
       </div>

@@ -14,8 +14,6 @@ import chatRoutes from "./routes/chatRoutes.js"; // <--- ADD THIS
 // ... existing imports
 import referralRoutes from "./routes/referralRoutes.js"; // <--- Add Import
 
-import chatRoutes from "./routes/chatRoutes.js"; // Import
-
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
