@@ -204,7 +204,7 @@ const TeamManagement = () => {
         try {
             // FIX: Using the correct TEAM_API_URL
             const { data } = await axios.post(
-                `${TEAM_API_URL}/generate-description`,
+                `${TEAM_API_URL}/generate-content`,
                 { 
                     prompt: projectTitle,
                     length: descriptionLength 

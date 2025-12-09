@@ -88,7 +88,7 @@ const AvailableMissions = () => {
             <MissionCard 
               key={task._id} 
               task={task} 
-              onAccept={handleAcceptMission} 
+              onAccept={() => handleAcceptMission(task)} 
               hasTeam={hasTeam}
               level={task.index}
             />
