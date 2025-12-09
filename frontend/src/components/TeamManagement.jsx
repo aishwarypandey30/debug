@@ -2,8 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import InvitationModal from './InvitationModal';
+import { useLocation } from 'react-router-dom';
 
 const TeamManagement = () => {
+    const location = useLocation();
+    const missionToApply = location.state?.missionToApply; // Check for redirected mission
+
     const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
     const [teamData, setTeamData] = useState(null);
@@ -237,6 +241,25 @@ const TeamManagement = () => {
         }
     };
 
+    const submitMissionApplication = async () => {
+        if (!missionToApply) return;
+        
+        try {
+            const { data } = await axios.post(`${TEAM_API_URL}/apply-mission`, 
+                { taskId: missionToApply._id }, 
+                { withCredentials: true }
+            );
+            
+            if (data.success) {
+                alert("Request sent to Mentor!");
+                // Clear the state so the banner disappears
+                navigate('/team/me', { state: {} });
+            }
+        } catch (error) {
+            alert(error.response?.data?.message || "Application failed");
+        }
+    };
+
     const handleImageUpload = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -374,6 +397,32 @@ const TeamManagement = () => {
     // HAS TEAM VIEW - DASHBOARD
     return (
         <div className="space-y-8 animate-fade-in w-full">
+
+            {/* NEW: Application Banner (Only visible if redirected from missions) */}
+            {missionToApply && isTeamLeader() && (
+                <div className="bg-red-900/20 border border-red-500 rounded-xl p-6 mb-6 flex justify-between items-center animate-pulse">
+                    <div>
+                        <h3 className="text-xl font-bold text-white">Confirm Mission Application</h3>
+                        <p className="text-gray-300">
+                            Apply for operation: <span className="text-red-400 font-bold">{missionToApply.title}</span>?
+                        </p>
+                    </div>
+                    <div className="flex gap-4">
+                        <button 
+                            onClick={() => navigate('/team/me', { state: {} })}
+                            className="px-4 py-2 text-gray-400 hover:text-white"
+                        >
+                            Cancel
+                        </button>
+                        <button 
+                            onClick={submitMissionApplication}
+                            className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-bold shadow-lg shadow-red-600/20"
+                        >
+                            Submit Request to Mentor
+                        </button>
+                    </div>
+                </div>
+            )}
             
             {/* Invitation Modal */}
             <InvitationModal 

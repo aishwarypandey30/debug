@@ -28,6 +28,9 @@ import AdminEvaluate from './pages/admin/AdminEvaluate.jsx';
 import AdminReferral from './pages/admin/AdminReferral.jsx'; 
 import AdminStudents from './pages/admin/AdminStudents.jsx';
 
+import MissionRequestsPage from './pages/admin/MissionRequestsPage';
+
+
 // Auth
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 
@@ -83,6 +86,8 @@ function App() {
             <Route path="/mentor/referral" element={<AdminReferral />} />
             <Route path="/mentor/students" element={<AdminStudents />} />
             <Route path="/mentor/alumni" element={<AlumniPage />} />
+            {/* // ... inside <Routes> -> Mentor Routes ... */}
+            <Route path="/mentor/requests" element={<MissionRequestsPage />} />
           </Route>
 
         </Route>
